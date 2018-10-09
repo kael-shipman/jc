@@ -1,0 +1,12 @@
+Package: json-configurator
+Version: ::VERSION::
+Section: free
+Priority: optional
+Architecture: all
+Depends: jq (>= 1.5), bash (>= 4.3)
+Installed-Size: 4
+Maintainer: Kael Shipman<kael.shipman@gmail.com>
+Description: A tiny, idempotent JSON Configurator for package maintainers
+ This utility makes manipulation of JSON config files from a package installation perspective
+ very easy. It's concise above all, and allows you to safely specify config values that should
+ be set if they're not already set, or optionally force-set even if they're already set.
