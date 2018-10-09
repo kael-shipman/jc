@@ -1,0 +1,199 @@
+#!/bin/bash
+
+set -e
+
+ME="$(basename "$0")"
+VERSION="1.0.0"
+
+function echo_help() {
+    echo "OVERVIEW"
+    echo
+    echo "      $ME - v$VERSION"
+    echo
+    echo "USAGE"
+    echo
+    echo "      $ME (-hvif) | [confkey] [confvalue] ([conffile])"
+    echo
+    echo "DESCRIPTION"
+    echo
+    echo "      This utility allows you to idempotently set config values in a json config file. It uses jq to do"
+    echo "      its work, and by default won't override keys that are already set. (Pass the -f|--force flag to"
+    echo "      force set a value.)"
+    echo
+    echo "      While it works fine with a [conffile] argument, you may also leave the last argument off to read"
+    echo "      from STDIN. This lets you pipe many calls together into a string that results in a final, finished"
+    echo "      config string, which you may then write to file."
+    echo
+    echo "      Note that jc will attempt to guess the type of value you're sending. For example, if the value is"
+    echo "      'true', 'false', 'null' or numeric, it will use those json native types. Otherwise, it will quote"
+    echo "      values that are not already quoted."
+    echo
+    echo "      See https://github.com/kael-shipman/jc for mor information"
+    echo
+    echo "OPTIONS"
+    echo
+    echo "      -h|--help               Display this help text"
+    echo
+    echo "      -v|--version            Display version information"
+    echo
+    echo "      -i|--in-place           Write back to the config file without printing to STDOUT. Note that this"
+    echo "                              (obviously) requires that you pass the conffile argument."
+    echo
+    echo "      -f|--force              Force a config key to be set to the value given, even if it's already set."
+    echo "                              Normally, config values that already exist are not overridden, but you can"
+    echo "                              change that behavior by passing this flag."
+    echo
+    echo "DEPENDENCIES"
+    echo
+    echo "      * bash > 4"
+    echo "      * jq > 1.5"
+    echo
+    echo "KNOWN PROBLEMS"
+    echo
+    echo "      * jc does not currently handle anything but regular objects (i.e., you can't mess with arrays.). There"
+    echo "        are nominally plans to support arrays, but there are simply not enough hours in the day right now."
+    echo "      * it also doesn't do well with special characters like dashes"
+    echo
+}
+
+FORCE=0
+INPLACE=0
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -h|--help) echo_help; exit ;;
+        -v|--version) echo "$VERSION"; exit ;;
+        -i|--in-place) INPLACE=1 ;;
+        -f|--force) FORCE=1; shift ;;
+        *)
+            if [ -z "$CONFKEY" ]; then
+                CONFKEY="$1"
+            elif [ -z "$CONFVAL" ]; then
+                CONFVAL="$1"
+            elif [ -z "$CONFFILE" ]; then
+                CONFFILE="$1"
+            else
+                >&2 echo_help
+                >&2 echo
+                >&2 echo "$ME: ERROR: Unknown option '$1' passed."
+                exit 1;
+            fi
+            shift
+        ;;
+    esac
+done
+
+
+if [ -z "$CONFKEY" ]; then
+    >&2 echo_help
+    >&2 echo
+    >&2 echo "$ME: ERROR: You must pass a configuration key as the second argument."
+    exit 3;
+fi
+
+if [ -z "$CONFVAL" ]; then
+    >&2 echo_help
+    >&2 echo
+    >&2 echo "$ME: ERROR: You must pass a configuration value as the third argument."
+    exit 4;
+fi
+
+if [ -n "$CONFFILE" ]; then
+    if [ ! -e "$CONFFILE" ]; then
+        echo "{}" > "$CONFFILE"
+    elif [ ! -f "$CONFFILE" ]; then
+        >&2 echo_help
+        >&2 echo
+        >&2 echo "$ME: ERROR: '$CONFFILE' appears not to be a regular file."
+        exit 5;
+    fi
+else
+    if [ "$INPLACE" -eq 1 ]; then
+        >&2 echo_help
+        >&2 echo
+        >&2 echo "$ME: ERROR: You've passed the -i|--in-place argument, but not [conffile] argument."
+        >&2 echo "     This doesn't make sense."
+        exit 6;
+    fi
+fi
+
+
+
+
+# Make some temporary files to facilitate the work and copy over the current config file
+f="$(mktemp)"
+t="$(mktemp)"
+if [ -n "$CONFFILE" ]; then
+    cp -f "$CONFFILE" "$f"
+else
+    cat - > "$f"
+fi
+
+
+
+
+IFS="." read -ra keys <<< "$CONFKEY"
+ln="${#keys[@]}"
+
+# We want to skip the last one, since that's the one that will hold the final value
+!((ln--))
+
+# Iterate through the keys and set any that aren't set yet (except the last one)
+fullpath="."
+proceed=1
+n=0
+while [ "$n" -lt "$ln" ]; do
+    if [ "$fullpath" == "." ]; then
+        midpath="${fullpath}${keys[$n]}"
+    else
+        midpath="${fullpath}.${keys[$n]}"
+    fi
+
+    # If the key doesn't already exist, mint it with a new object
+    if ! jq -e "$fullpath | has("'"'${keys[$n]}'"'")" "$f" >/dev/null; then
+        jq "$midpath = {}" "$f" > "$t"
+        cp -f "$t" "$f"
+
+    # If it DOES already exist and is falsey, then it probably shouldn't be set unless we're forcing
+    elif ! jq -e "$midpath" "$f" >/dev/null && [ "$FORCE" -eq 0 ]; then
+        proceed=0
+        break
+    fi
+
+    fullpath="$midpath"
+    !((n++))
+done
+
+
+
+# Before proceeding, make sure we actually want to write the value
+if [ "$proceed" -eq 1 ] && jq -e "$fullpath | has("'"'${keys[$n]}'"'")" "$f" >/dev/null && [ "$FORCE" -eq 0 ]; then
+    proceed=0
+fi
+
+
+
+# Now we should have the path, and we should be able to write the value (if we're marked to proceed)
+if [ "$proceed" -eq 1 ]; then
+    # If it's a "native" value, use argjson, else use arg
+    if echo "$CONFVAL" | egrep -q '^true|false|null|[0-9.]+$'; then
+        jq --argjson v "$CONFVAL" ".$CONFKEY = \$v" "$f" > "$t"
+    else
+        jq --arg v "$CONFVAL" ".$CONFKEY = \$v" "$f" > "$t"
+    fi
+    cp -f "$t" "$f"
+fi
+
+
+
+# Now output or save
+if [ "$INPLACE" -eq 1 ]; then
+    cp -f "$f" "$CONFFILE"
+else
+    jq . "$f"
+fi
+
+
+
+# Clean up and exit
+rm "$f" "$t"
+
