@@ -51,7 +51,6 @@ KNOWN PROBLEMS
 
       * jc does not currently handle anything but regular objects (i.e., you can't mess with arrays.). There
         are nominally plans to support arrays, but there are simply not enough hours in the day right now.
-      * it also doesn't do well with special characters like dashes
 ```
 
 

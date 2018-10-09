@@ -52,7 +52,6 @@ function echo_help() {
     echo
     echo "      * jc does not currently handle anything but regular objects (i.e., you can't mess with arrays.). There"
     echo "        are nominally plans to support arrays, but there are simply not enough hours in the day right now."
-    echo "      * it also doesn't do well with special characters like dashes"
     echo
 }
 
@@ -142,11 +141,7 @@ fullpath="."
 proceed=1
 n=0
 while [ "$n" -lt "$ln" ]; do
-    if [ "$fullpath" == "." ]; then
-        midpath="${fullpath}${keys[$n]}"
-    else
-        midpath="${fullpath}.${keys[$n]}"
-    fi
+    midpath="${fullpath}["'"'"${keys[$n]}"'"'"]"
 
     # If the key doesn't already exist, mint it with a new object
     if ! jq -e "$fullpath | has("'"'${keys[$n]}'"'")" "$f" >/dev/null; then
@@ -174,11 +169,13 @@ fi
 
 # Now we should have the path, and we should be able to write the value (if we're marked to proceed)
 if [ "$proceed" -eq 1 ]; then
+    fullpath="${fullpath}["'"'"${keys[$n]}"'"'"]"
+
     # If it's a "native" value, use argjson, else use arg
     if echo "$CONFVAL" | egrep -q '^true|false|null|[0-9.]+$'; then
-        jq --argjson v "$CONFVAL" ".$CONFKEY = \$v" "$f" > "$t"
+        jq --argjson v "$CONFVAL" "$fullpath = \$v" "$f" > "$t"
     else
-        jq --arg v "$CONFVAL" ".$CONFKEY = \$v" "$f" > "$t"
+        jq --arg v "$CONFVAL" "$fullpath = \$v" "$f" > "$t"
     fi
     cp -f "$t" "$f"
 fi
