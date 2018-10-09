@@ -3,7 +3,7 @@
 set -e
 
 ME="$(basename "$0")"
-VERSION="1.0.0"
+VERSION="::VERSION::"
 
 function echo_help() {
     echo "OVERVIEW"
@@ -61,7 +61,7 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         -h|--help) echo_help; exit ;;
         -v|--version) echo "$VERSION"; exit ;;
-        -i|--in-place) INPLACE=1 ;;
+        -i|--in-place) INPLACE=1; shift ;;
         -f|--force) FORCE=1; shift ;;
         *)
             if [ -z "$CONFKEY" ]; then
@@ -127,58 +127,56 @@ else
     cat - > "$f"
 fi
 
+trap "rm '$f' '$t' 2>/dev/null" EXIT
+
 
 
 
 IFS="." read -ra keys <<< "$CONFKEY"
 ln="${#keys[@]}"
 
-# We want to skip the last one, since that's the one that will hold the final value
-!((ln--))
-
-# Iterate through the keys and set any that aren't set yet (except the last one)
-fullpath="."
+# Iterate through the keys and set any that aren't set yet
+demipath="."
 proceed=1
 n=0
 while [ "$n" -lt "$ln" ]; do
-    midpath="${fullpath}["'"'"${keys[$n]}"'"'"]"
+    fullpath="${demipath}["'"'"${keys[$n]}"'"'"]"
 
     # If the key doesn't already exist, mint it with a new object
-    if ! jq -e "$fullpath | has("'"'${keys[$n]}'"'")" "$f" >/dev/null; then
-        jq "$midpath = {}" "$f" > "$t"
+    if ! jq -e "$demipath | has("'"'${keys[$n]}'"'")" "$f" >/dev/null; then
+        jq "$fullpath = {}" "$f" > "$t"
         cp -f "$t" "$f"
-
-    # If it DOES already exist and is falsey, then it probably shouldn't be set unless we're forcing
-    elif ! jq -e "$midpath" "$f" >/dev/null && [ "$FORCE" -eq 0 ]; then
-        proceed=0
-        break
     fi
 
-    fullpath="$midpath"
+    # If the key has a scalar value....
+    if jq -e "$fullpath|scalars" "$f" >/dev/null; then
+        # If we're not forcing, break here
+        if [ "$FORCE" -eq 0 ]; then
+            break
+        fi
+
+        # Otherwise, if we've got more keys to go, set it to an object so we can keep going
+        if [ "$(expr $n + 1)" -lt "$ln" ]; then
+            jq "$fullpath = {}" "$f" > "$t"
+            cp -f "$t" "$f"
+        fi
+    fi
+
+    # If this is our last time around, set the value
+    if [ "$(expr $n + 1)" -eq "$ln" ]; then
+        # If it looks like a "native" value, use argjson, else use arg
+        if echo "$CONFVAL" | egrep -q '^(true|false|null|[0-9.]+)$'; then
+            jq --argjson v "$CONFVAL" "$fullpath = \$v" "$f" > "$t"
+        else
+            jq --arg v "$CONFVAL" "$fullpath = \$v" "$f" > "$t"
+        fi
+        cp -f "$t" "$f"
+    fi
+
+    demipath="$fullpath"
     !((n++))
 done
 
-
-
-# Before proceeding, make sure we actually want to write the value
-if [ "$proceed" -eq 1 ] && jq -e "$fullpath | has("'"'${keys[$n]}'"'")" "$f" >/dev/null && [ "$FORCE" -eq 0 ]; then
-    proceed=0
-fi
-
-
-
-# Now we should have the path, and we should be able to write the value (if we're marked to proceed)
-if [ "$proceed" -eq 1 ]; then
-    fullpath="${fullpath}["'"'"${keys[$n]}"'"'"]"
-
-    # If it's a "native" value, use argjson, else use arg
-    if echo "$CONFVAL" | egrep -q '^true|false|null|[0-9.]+$'; then
-        jq --argjson v "$CONFVAL" "$fullpath = \$v" "$f" > "$t"
-    else
-        jq --arg v "$CONFVAL" "$fullpath = \$v" "$f" > "$t"
-    fi
-    cp -f "$t" "$f"
-fi
 
 
 
@@ -189,8 +187,4 @@ else
     jq . "$f"
 fi
 
-
-
-# Clean up and exit
-rm "$f" "$t"
 
