@@ -56,7 +56,7 @@ KNOWN PROBLEMS
 
 ## Use Cases
 
-To illustrate how you would use it, suppose you have a config file, ~/my-config.json that was installed in some package:
+To illustrate how you would use it, suppose you have a config file, `~/my-config.json`, that was installed in some package:
 
 ```json
 {
@@ -71,7 +71,7 @@ To illustrate how you would use it, suppose you have a config file, ~/my-config.
 }
 ```
 
-You might have created and installed the package some time ago, before you added the `email` config section. When you update the package, you might use the following to ensure the config is in the correct state:
+You might have created and installed the package some time ago, and then more recently added an `email` config section. When you update the package, you might use the following to ensure the config is in the correct state:
 
 ```sh
 cat ~/my-config.json | \
@@ -82,13 +82,13 @@ jc email.stubAddress "$USERS_EMAIL" | \
 tee ~/my-config.json >/dev/null
 ```
 
-The above would result in a ~/my-config.json file like this:
+The above, applied to the given config file, would result in a final `~/my-config.json` file like this:
 
 ```json
 {
   "database": {
     "default": {
-      "socket": "/some/path/to/socket"
+      "socket": "/some/path/to/socket",
       "username": "my-user",
       "password": "my-pass"
     },
@@ -100,7 +100,7 @@ The above would result in a ~/my-config.json file like this:
 }
 ```
 
-**Important:** Notice that `database.debug` is still set to false, even though our script said to set it to true. With config, it's always important to recognize that the user may change config values hirmself, and that you shouldn't overwrite values that are already writen unless you know them to be wrong (which you can check for in your script using naked `jq`).
+**Important:** Notice that `database.debug` is still set to false, even though our script said to set it to true. With config, it's always important to recognize that the user may change config values hirmself, and that you shouldn't overwrite values that are already writen unless you know them to be wrong (which you can check for in your script using naked `jq`). `jc` does not overwrite existing config by default. If you _know_ you want to overwrite config, you should pass the `-f|--force` flag.
 
-Also note that unfortunately, because of the way the shell works, you MUST use `tee` or a temp file, since trying to redirect the output to the file you're catting from will zero out the file before it gets read. (I.e., don't do this: `cat ~/my-config.json | jc database.debug true > ~/my-config.json` because you'll get a blank file with no warning.)
+Also note that unfortunately, because of the way the shell works, you MUST use `tee` (as above) or a temp file to pipe results to, since trying to redirect the output to the file you're catting from will zero out the file before it gets read. (I.e., don't do this: `cat ~/my-config.json | jc database.debug true > ~/my-config.json` because you'll get a blank file with no warning about it.)
 
