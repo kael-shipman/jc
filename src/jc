@@ -165,7 +165,7 @@ while [ "$n" -lt "$ln" ]; do
     # If this is our last time around, set the value
     if [ "$(expr $n + 1)" -eq "$ln" ]; then
         # If it looks like a "native" value, use argjson, else use arg
-        if echo "$CONFVAL" | egrep -q '^(true|false|null|[0-9.]+)$'; then
+        if echo "$CONFVAL" | egrep -q '^(true|false|null|-?[0-9]*\.?[0-9]+)$'; then
             jq --argjson v "$CONFVAL" "$fullpath = \$v" "$f" > "$t"
         else
             jq --arg v "$CONFVAL" "$fullpath = \$v" "$f" > "$t"
