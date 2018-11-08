@@ -64,11 +64,11 @@ while [ "$#" -gt 0 ]; do
         -i|--in-place) INPLACE=1; shift ;;
         -f|--force) FORCE=1; shift ;;
         *)
-            if [ -z "$CONFKEY" ]; then
+            if [ -z "${CONFKEY+x}" ]; then
                 CONFKEY="$1"
-            elif [ -z "$CONFVAL" ]; then
+            elif [ -z "${CONFVAL+x}" ]; then
                 CONFVAL="$1"
-            elif [ -z "$CONFFILE" ]; then
+            elif [ -z "${CONFFILE+x}" ]; then
                 CONFFILE="$1"
             else
                 >&2 echo_help
@@ -85,25 +85,30 @@ done
 if [ -z "$CONFKEY" ]; then
     >&2 echo_help
     >&2 echo
-    >&2 echo "$ME: ERROR: You must pass a configuration key as the first argument."
+    >&2 echo "$ME: ERROR: You must pass a non-blank configuration key as the first argument."
     exit 3;
 fi
 
-if [ -z "$CONFVAL" ]; then
+if [ -z "${CONFVAL+x}" ]; then
     >&2 echo_help
     >&2 echo
     >&2 echo "$ME: ERROR: You must pass a configuration value as the second argument."
     exit 4;
 fi
 
-if [ -n "$CONFFILE" ]; then
-    if [ ! -e "$CONFFILE" ]; then
-        echo "{}" > "$CONFFILE"
-    elif [ ! -f "$CONFFILE" ]; then
+if [ ! -z "${CONFFILE+x}" ]; then
+    if [ -z "$CONFFILE" ]; then
+        >&2 echo "$ME: ERROR: You passed a blank string for the conffile argument. This must have been a mistake."
+        exit 7;
+    fi
+
+    if [ -e "$CONFFILE" ] && [ ! -f "$CONFFILE" ]; then
         >&2 echo_help
         >&2 echo
         >&2 echo "$ME: ERROR: '$CONFFILE' appears not to be a regular file."
         exit 5;
+    elif [ ! -e "$CONFFILE" ]; then
+        echo "{}" > "$CONFFILE"
     fi
 else
     if [ "$INPLACE" -eq 1 ]; then
