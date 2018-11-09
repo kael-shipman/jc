@@ -1,0 +1,10 @@
+{
+    "build-dirs": [ "pkg-build" ],
+    "packages": {
+        "deb": {
+            "options": {
+                "releases": ["xenial","artful","bionic"]
+            }
+        }
+    }
+}
