@@ -1,0 +1,28 @@
+{
+    "string": "test",
+    "number": 1,
+    "boolean": true,
+    "null": null,
+    "array": [ "one", 2, true, null ],
+    "subobject": {
+        "string": "subtest",
+        "number": 2,
+        "boolean": false,
+        "null": null,
+        "array": [ "one", 2, true, null ],
+        "subobject": {
+            "string": "deep",
+            "number": 3,
+            "boolean": true,
+            "null": null,
+            "array": [ "one", 2, true, null ],
+            "subobject": {
+                "string": "deeper",
+                "number": 4,
+                "boolean": false,
+                "null": null,
+                "array": [ "one", 2, true, null ]
+            }
+        }
+    }
+}

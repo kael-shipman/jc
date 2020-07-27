@@ -145,7 +145,45 @@ demipath="."
 proceed=1
 n=0
 while [ "$n" -lt "$ln" ]; do
-    fullpath="${demipath}["'"'"${keys[$n]}"'"'"]"
+    # if it has its own brackets, use it as-is
+    if echo "${keys[$n]}" | grep -Eq "^\\[.*\\]$"; then
+        fullpath="${demipath}${keys[$n]}"
+    else
+        if echo "${keys[$n]}" | grep -Eq "^[0-9]+$"; then
+            # if the key is numeric, let it be numeric
+            fullpath="${demipath}[${keys[$n]}]"
+        else
+            # otherwise, enclose it in quotes
+            fullpath="${demipath}["'"'"${keys[$n]}"'"'"]"
+        fi
+    fi
+
+    # Determine if we think we're dealing with an array
+    if echo "${keys[$n]}" | grep -Eq "^(\[[0-9]*\]|[0-9]+)$"; then
+        IS_ARRAY=1
+    else
+        IS_ARRAY=0
+    fi
+
+    # Handle arrays differently
+    if [ "$IS_ARRAY" -eq 1 ]; then
+        # TODO: Pick back up here
+    fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     # If the key doesn't already exist, mint it with a new object
     if ! jq -e "$demipath | has("'"'${keys[$n]}'"'")" "$f" >/dev/null; then
